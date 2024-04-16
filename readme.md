@@ -1,6 +1,6 @@
 ## problem
 Define at [OpenABE API Doc](https://github.com/zeutro/openabe/blob/master/docs/libopenabe-v1.0.0-api-doc.pdf) - Section 2.3 - page 13.
-### Cấu trúc Policy Tree
+### Policy Tree Structure
 - Policy tree is a (**boolean formulas**). Include:   
   1. OR
   2. AND

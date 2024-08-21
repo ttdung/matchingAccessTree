@@ -18,8 +18,9 @@ type PolicyTree struct {
 }
 
 func NewPolicyTree(s string) *PolicyTree {
+	sExtend := "(" + s + ")"
 	return &PolicyTree{
-		Content: s,
+		Content: sExtend,
 	}
 }
 

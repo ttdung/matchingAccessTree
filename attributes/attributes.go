@@ -3,7 +3,6 @@ package attributes
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -86,7 +85,7 @@ func ParseDateRange(s string) (int, int, error) {
 	return date1.DateToInt(), date2.DateToInt(), nil
 }
 
-func parseAttribute(s string) (string, int) {
+func parseAttribute(s string) (string, int, error) {
 	splitSlice := strings.Split(s, "=")
 	field := splitSlice[0]
 	field = strings.TrimSpace(field)
@@ -97,20 +96,17 @@ func parseAttribute(s string) (string, int) {
 		valueString := splitSlice[1]
 		val, err := ParseValue(valueString)
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return "", 0 , err
 		}
 
 		value = val
 	}
 
 	//fmt.Println("value = ", value);
-	return field, value
+	return field, value, nil
 }
 
-func NewAttributeFromString(s string) *Attribute {
-	//fmt.Println("Attributes: ", s);
-
+func NewAttributeFromString(s string) (*Attribute, error) {
 	splitSlice := strings.Split(s, "|")
 
 	list := make(map[string]int)
@@ -120,14 +116,16 @@ func NewAttributeFromString(s string) *Attribute {
 			continue
 		}
 
-		//fmt.Println("attribute string = ", v);
-		field, value := parseAttribute(v)
+		field, value, err := parseAttribute(v)
+		if err != nil {
+			return nil, err
+		}
+
 		list[field] = value
-		//fmt.Println();
 	}
 	return &Attribute{
 		List: list,
-	}
+	}, nil
 }
 
 func (a *Attribute) SetAttribute(lable string, value int) {

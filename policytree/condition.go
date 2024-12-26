@@ -32,16 +32,16 @@ func NewCondition(s string) *Condition {
 }
 
 // Return Value, isError
-func (c *Condition) SolveConditionString(attribute attributes.Attribute) (bool, error, bool) {
+func (c *Condition) SolveConditionString(attribute attributes.Attribute) (bool, bool, error) {
 	if c.Content == "" {
-		return false, nil, false
+		return false, false, nil
 	}
 
 	//fmt.Println("Solving condition: ", c.Content)
 
 	conditionType, err := c.findConditionType()
 	if err != nil {
-		return false, err, false
+		return false, false, err
 	}
 	c.conditionType = conditionType
 
@@ -59,10 +59,10 @@ func (c *Condition) SolveConditionString(attribute attributes.Attribute) (bool, 
 	case DateRange:
 		value, err = c.solveDateRange(attribute)
 	default:
-		value, err = false, fmt.Errorf("CAN'T MATCH CONDITION TYPE")
+		value, err = false, fmt.Errorf("can't match policy type")
 	}
 
-	return value, err, true
+	return value, true, err
 }
 
 func (c *Condition) solveFieldOnly(attr attributes.Attribute) (bool, error) {
@@ -109,7 +109,7 @@ func (c *Condition) solveComperation(attr attributes.Attribute) (bool, error) {
 		return compare(attr, splitPatterns[0], &splitPatterns[1], func(a int, b int) bool { return a == b })
 	}
 
-	return false, fmt.Errorf("CAN'T MATCH COMPARATION TYPE")
+	return false, fmt.Errorf("can't match policy type")
 }
 
 func (c *Condition) solveNumberRange(attr attributes.Attribute) (bool, error) {
@@ -197,7 +197,7 @@ func (c *Condition) findConditionType() (ConditionType, error) {
 		return ConditionType(Comparation), nil
 	}
 
-	return 0, fmt.Errorf("CONDITION WITH WRONG FORMAT")
+	return 0, fmt.Errorf("POLICY WITH WRONG FORMAT")
 }
 
 func (c *Condition) isOnlyField() bool {

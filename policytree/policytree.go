@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/ttdung/matchingAccessTree/attributes"
 	"github.com/ttdung/matchingAccessTree/utils"
-	"log"
-	"os"
 	"unicode/utf8"
 )
 
@@ -47,20 +45,15 @@ func isOperationString(s string) bool {
 	return isAndOperation(s) || isOrOperation(s)
 }
 
-func solveConditionString(conditionString string, attribute attributes.Attribute) (bool, bool) {
+func solveConditionString(conditionString string, attribute attributes.Attribute) (bool, bool, error) {
 	conditionObj := NewCondition(conditionString)
 
-	var val bool
-	var err error
-	var isPush bool
-
-	val, err, isPush = conditionObj.SolveConditionString(attribute)
+	val, is_push, err := conditionObj.SolveConditionString(attribute)
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		return false, false, err
 	}
 
-	return val, isPush
+	return val, is_push, nil
 }
 
 func tryToSolveOperation(operation string, valueStack *utils.Stack) (bool, error) {
@@ -81,13 +74,12 @@ func tryToSolveOperation(operation string, valueStack *utils.Stack) (bool, error
 	return value, nil
 }
 
-func handleExpression(operationStack *utils.Stack, valueStack *utils.Stack) {
+func handleExpression(operationStack *utils.Stack, valueStack *utils.Stack) error {
 	for operationStack.Length() > 0 && operationStack.Peek() != '(' {
 		operation := operationStack.Pop().(string)
-		value, error := tryToSolveOperation(operation, valueStack)
-		if error != nil {
-			fmt.Println(error)
-			os.Exit(1)
+		value, err := tryToSolveOperation(operation, valueStack)
+		if err != nil {
+			return err
 		} else {
 			valueStack.Push(value)
 		}
@@ -96,14 +88,19 @@ func handleExpression(operationStack *utils.Stack, valueStack *utils.Stack) {
 	if operationStack.Length() > 0 {
 		operationStack.Pop()
 	}
+
+	return nil
 }
 
-func solveWithEndWord(operationStack *utils.Stack, valueStack *utils.Stack, buffer string, conditionString string, attributes attributes.Attribute) (string, string) {
+func solveWithEndWord(operationStack *utils.Stack, valueStack *utils.Stack, buffer string, conditionString string, attributes attributes.Attribute) (string, string, error) {
 	if isOperationString(buffer) { // it is AND or OR
 		// fmt.Println("\t", buffer, " is an operation")
-		value, isPush := solveConditionString(conditionString, attributes)
+		value, is_push, err := solveConditionString(conditionString, attributes)
+		if err != nil {
+			return "", "", nil
+		}
 
-		if isPush {
+		if is_push {
 			valueStack.Push(value)
 		}
 
@@ -116,21 +113,23 @@ func solveWithEndWord(operationStack *utils.Stack, valueStack *utils.Stack, buff
 		buffer = ""
 	}
 
-	return buffer, conditionString
+	return buffer, conditionString, nil
 }
 
-func solveWithEndCondition(valueStack *utils.Stack, conditionString string, attributes attributes.Attribute) string {
-	value, ok := solveConditionString(conditionString, attributes)
+func solveWithEndCondition(valueStack *utils.Stack, conditionString string, attributes attributes.Attribute) (string, error) {
+	value, ok, err := solveConditionString(conditionString, attributes)
+	if err != nil {
+		return "", err
+	}
+
 	if ok {
 		valueStack.Push(value)
 	}
 
-	conditionString = ""
-
-	return conditionString
+	return "", nil
 }
 
-func (pTree *PolicyTree) EvaluatePolicyTree(attributes attributes.Attribute) bool {
+func (pTree *PolicyTree) EvaluatePolicyTree(attributes attributes.Attribute) (bool, error) {
 	valueStack := utils.NewStack()
 	operationStack := utils.NewStack()
 
@@ -140,39 +139,46 @@ func (pTree *PolicyTree) EvaluatePolicyTree(attributes attributes.Attribute) boo
 	// 	fmt.Printf("%#U starts at %d\n", runeValue, idx)
 	// }
 
-	conditionString := ""
-	buffer := ""
+	var conditionString string
+	var buffer string
+	var err error
 
 	//fmt.Println("\nUsing DecodeRuneInString")
 	for i, w := 0, 0; i < len(s); i += w {
 		runeValue, width := utf8.DecodeRuneInString(s[i:])
 		w = width
-		// fmt.Printf("%#U starts at %d\n", runeValue, i)
 
 		if runeValue == '(' {
-			//fmt.Printf("( at position %d\n", i)
 			operationStack.Push('(')
-
 		} else if runeValue == ')' {
-			//fmt.Printf(") at position %d, buffer = %s, conditionString = %s\n", i, buffer, conditionString)
+			buffer, conditionString, err = solveWithEndWord(operationStack, valueStack, buffer, conditionString, attributes)
+			if err != nil {
+				return false, err
+			}
 
-			buffer, conditionString = solveWithEndWord(operationStack, valueStack, buffer, conditionString, attributes)
-			conditionString = solveWithEndCondition(valueStack, conditionString, attributes)
+			conditionString, err = solveWithEndCondition(valueStack, conditionString, attributes)
+			if err != nil {
+				return false, err
+			}
 
-			handleExpression(operationStack, valueStack)
-
-			//fmt.Println("\tvalueStack: ", valueStack)
-			//fmt.Println("\toperationStack: ", operationStack)
+			err = handleExpression(operationStack, valueStack)
+			if err != nil {
+				return false, err
+			}
 		} else if runeValue == ' ' {
-			//fmt.Printf("Space, buffer = %s, condition string = %s\n", buffer, conditionString)
-			buffer, conditionString = solveWithEndWord(operationStack, valueStack, buffer, conditionString, attributes)
-			//fmt.Println("\tvalueStack: ", valueStack)
-			//fmt.Println("\toperationStack: ", operationStack)
+			buffer, conditionString, err = solveWithEndWord(operationStack, valueStack, buffer, conditionString, attributes)
+			if err != nil {
+				return false, err
+			}
 		} else { // it is a character
 			buffer = buffer + string(runeValue)
 		}
 	}
 
-	handleExpression(operationStack, valueStack)
-	return valueStack.Pop().(bool)
+	err = handleExpression(operationStack, valueStack)
+	if err != nil {
+		return false, err
+	}
+
+	return valueStack.Pop().(bool), nil
 }
